@@ -156,6 +156,7 @@ void trace_ft(int last_instant,int num_processes,vector<Process> processes){
     }
     cout << dashes << endl;
     cout << endl;
+    
     // do we need another endl?
 }
 
