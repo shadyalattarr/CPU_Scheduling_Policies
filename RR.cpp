@@ -6,12 +6,13 @@
 #include <cmath>      // For mathematical functions
 #include <sstream>
 #include <cstdlib>
+#include <queue>
 using namespace std;
 
 struct Process{
     string process_name;
     int arrival_time;
-    int start_time;
+    int start_time; // start time is not useful here?
     int service_time;
     int finish_time;
     int time_served_so_far; // starts with 0 and when it reaches service time it is done
@@ -56,6 +57,7 @@ vector<Process> get_Processes_as_struct(vector<string> processes,int num_process
         curr_process.process_name = curr_process_params[0];
         curr_process.arrival_time = stoi(curr_process_params[1]);
         curr_process.service_time = stoi(curr_process_params[2]);
+        curr_process.time_served_so_far = 0;
         // finish time is found out after running
         struct_Processes[i] = curr_process;
     }
@@ -63,22 +65,278 @@ vector<Process> get_Processes_as_struct(vector<string> processes,int num_process
     return struct_Processes;
 }
 
-Process select_process(vector<Process> all_processes,int ps_in_bag,int *current_index){
-    int ret_index = *current_index;
-    // ps_in_bag are the processes that have arrived
-    // ps_in_bag max is num_processes
-    *current_index = (*current_index + 1) % ps_in_bag;
-    return all_processes[ret_index];
+Process select_process(queue<Process> * ready_queue){
+    if (ready_queue->empty()) { // no process is ready
+        // shouldnt stop execution tho
+        // should not come here if ready queue is empty
+        throw std::runtime_error("Error: Ready queue is empty, no process to select.");
+    }
+
+    // Get the process at the front of the queue
+    Process selected_process = ready_queue->front();
+    
+    // Remove the selected process from the queue
+    ready_queue->pop();
+    
+    return selected_process;
 }
 
-vector<Process> run_rr(vector<string> string_processes,int num_processes,int last_instant){
-    // we need the vector to have the n processes, with info on where they ran?
-    vector<Process> all_processes = get_Processes_as_struct(string_processes,num_processes);
+// Function to print the contents of a queue
+void print_queue(const queue<Process>& ready_queue) {
+    if (ready_queue.empty()) {
+        std::cout << "Ready queue is empty.\n";
+        return;
+    }
 
-    // Sort the processes based on arrival_time
-    sort(all_processes.begin(), all_processes.end(), [](const Process& a, const Process& b) {
-        return a.arrival_time < b.arrival_time;
-    });
+    // Create a copy of the queue to preserve the original
+    std::queue<Process> temp_queue = ready_queue;
+    std::cout << "Queue Contents:\n";
+
+    // Iterate through the queue
+    while (!temp_queue.empty()) {
+        const Process& proc = temp_queue.front();
+        std::cout << "Process Name: " << proc.process_name
+                  << ", Arrival Time: " << proc.arrival_time
+                  << ", Service Time: " << proc.service_time
+                  << ", Time Served So Far: " << proc.time_served_so_far << "\n";
+        temp_queue.pop(); // Remove the front process
+    }
+}
+
+
+bool hasProcess(queue<Process>& processQueue, const Process& target) {
+    // Temporary container to store queue elements for iteration
+    deque<Process> tempQueue;
+
+    // Iterate through the queue
+    bool found = false;
+    while (!processQueue.empty()) {
+        Process current = processQueue.front();
+        processQueue.pop();
+
+        // Check if the current process matches the target
+        if (current.process_name == target.process_name) { // we find if it is in queue using name
+            found = true;
+        }
+        
+        // Store the process in the temporary queue
+        tempQueue.push_back(current);
+    }
+
+    // Restore the original queue from the temporary container
+    for (const auto& p : tempQueue) {
+        processQueue.push(p);
+    }
+
+    return found;
+}
+void serveProcess(Process& current_process_running, int time) {
+    // Increment time served so far
+    current_process_running.time_served_so_far++;
+
+    // Print serving message
+    cout << "SERVING : " << current_process_running.process_name << endl;
+
+    // Check if the process has finished
+    if (current_process_running.time_served_so_far == current_process_running.service_time) {
+        // Process is done
+        current_process_running.finish_time = time;
+        cout << "Process " << current_process_running.process_name << " just finished at time " << time << std::endl;
+    }
+}
+
+// Update the trace matrix based on the ready queue and the running process
+void updateTrace(std::vector<std::vector<char>>& trace, 
+                 const std::vector<Process>& all_processes, 
+                 const Process& current_process_running, 
+                 std::queue<Process> ready_queue, 
+                 int time, 
+                 int num_processes) {
+    std::cout << std::endl;
+    std::cout << "-------------------------------------------" << std::endl;
+
+    // Iterate through all processes
+    for (int p = 0; p < num_processes; ++p) {
+        // Check if process is in the ready queue
+        if (hasProcess(ready_queue, all_processes[p])) {
+            // Process is in ready queue
+            std::cout << all_processes[p].process_name << " is in ready queue" << std::endl;
+            trace[p][time] = '.';  // Update trace to show waiting
+            std::cout << all_processes[p].process_name << " has been shown ." << std::endl;
+        } 
+        // Check if the process is currently running
+        else if (current_process_running.process_name == all_processes[p].process_name) {
+            trace[p][time] = '*';  // Update trace to show running
+            std::cout << current_process_running.process_name << " has been shown *" << std::endl;
+        } 
+        // Process is not in ready queue or running
+        else {
+            trace[p][time] = ' ';  // No change (space)
+        }
+    }
+
+    std::cout << "-------------------------------------------" << std::endl << std::endl;
+}
+
+
+vector<vector<char>> run_rr(vector<Process>& all_processes,int num_processes,int last_instant,int quantum){
+    int next_process_to_be_ready = 0; // because we got the processes sorted with arrival time
+    // Create a 2D vector
+    vector<vector<char>> trace(num_processes, vector<char>(quantum, ' '));
+    // ready queue
+    queue<Process> ready_queue;
+    Process null_process;
+    null_process.process_name = "null";
+    Process current_process_running = null_process;
+    // need to initialize current process somehow
+    for(int time=0;time<=last_instant;time++){
+
+        cout << "time: " << time << endl;
+        cout << "current_process: " << current_process_running.process_name << endl;
+        // for each time quantum we need to check things
+        // anything to add to ready queue? anything arrived
+        while(next_process_to_be_ready < num_processes && all_processes[next_process_to_be_ready].arrival_time == time){
+            cout << "TIME: " << time << endl;
+            cout << "adding to queue: " << endl;
+            cout << all_processes[next_process_to_be_ready].process_name << endl;
+            cout << "arrival at " << all_processes[next_process_to_be_ready].arrival_time << endl;
+            ready_queue.push(all_processes[next_process_to_be_ready]);
+            next_process_to_be_ready++;
+        }
+        
+
+        if(current_process_running.process_name != "null"){ // there is a currently running process
+            // are we done with CURRENT process?
+
+            if(current_process_running.time_served_so_far < current_process_running.service_time){
+                // still not done
+                // check quantum
+                if(current_process_running.time_served_so_far%quantum == 0){
+                    // it's time is done
+                    // quantum finished
+                    ready_queue.push(current_process_running); // preempt process
+                    cout << "We prempted " << current_process_running.process_name << endl;
+                    // take another
+                    print_queue(ready_queue);
+                    current_process_running = select_process(&ready_queue); // if it is the only one then np
+                    cout << "AND TOOK " << current_process_running.process_name << endl;
+                    serveProcess(current_process_running,time); // serve the new process
+                    print_queue(ready_queue);
+                } else{
+                    // my quantum is not finished AND am not done
+                    // then contune yourself 3adi - cant preempt
+                    // continue ?
+                    serveProcess(current_process_running,time); 
+                }
+            } else{
+                //dome, give me next process --
+                // what if there is no process? we go next 3adi
+                if(ready_queue.empty()){
+                    // no process?
+                    current_process_running = null_process;
+                    cout << "NOTHING IN READY QUQUUE THO" << endl;
+                    print_queue(ready_queue);
+            // update trace?
+
+                    updateTrace(trace,all_processes,current_process_running,ready_queue,time,num_processes);
+        
+                    continue;
+                    // no process to serve
+                }
+                //curr process done and next is up
+                current_process_running = select_process(&ready_queue);
+                serveProcess(current_process_running,time);
+            }
+
+            print_queue(ready_queue);
+        }else{
+            // no process running rn
+            if(!ready_queue.empty()){ // 
+                // smth ready
+                // this line is extra
+                current_process_running = select_process(&ready_queue);
+                cout << "current_process: " << current_process_running.process_name << endl;
+                // if first time, this is start time?
+                serveProcess(current_process_running,time);
+            }
+            else{
+                // nothing is ready and we have nothing currently running
+                cout << " // nothing is ready and we have nothing currently running" << endl;
+                //continue;
+            }
+        }
+
+
+        // dont do continue to update trace vector
+
+        // we update trace
+        // every process is space
+        // except those in ready queue is .
+        // and current_process_running is *
+        
+        updateTrace(trace,all_processes,current_process_running,ready_queue,time,num_processes);
+        
+        // cout << endl;
+        // cout << "-------------------------------------------" << endl;
+        // //cout << "READY QUEUE BEFORE :" << endl ;
+        // //print_queue(ready_queue);
+        // for(int p=0;p<num_processes;p++){
+            
+        //     // check if in ready queue
+        //     if(hasProcess(ready_queue,all_processes[p])){
+        //         // if in ready queue
+        //         cout << all_processes[p].process_name << " is in ready queue" << endl;
+        //         trace[p][time] = '.';
+        //         cout << all_processes[p].process_name << " has been shown ." << endl;
+        //     }
+        //     else if(current_process_running.process_name == all_processes[p].process_name){
+        //         trace[p][time] = '*';
+        //         cout << current_process_running.process_name << " has been shown *" << endl;
+        //     }else {
+        //         trace[p][time] = ' '; //-- already like that
+        //     }
+        // }
+        // //cout << "READY QUEUE AFTER: " << endl;
+        // //print_queue(ready_queue);
+        // cout << "-------------------------------------------" << endl << endl;
+
+
+        // // are we done with CURRENT process?
+        // if(current_process_running.time_served_so_far < current_process_running.service_time){
+        //     // still not done
+            
+        //     // check quantum
+        //     if(time%quantum == 0){
+        //         // it's time is done
+                
+        //         // quantum finished
+        //         ready_queue.push(current_process_running); // preempt process
+        //         cout << "We prempted " << current_process_running.process_name << endl;
+        //         // take another
+        //         current_process_running = select_process(&ready_queue); // if it is the only one then np
+        //         cout << "AND TOOK " << current_process_running.process_name << endl;
+        //     } else{
+        //         // my quantum is not finished AND am not done
+        //         // then contune yourself 3adi - cant preempt
+        //         // continue ?
+        //     }
+
+        // } else{
+        //     //dome, give me next process --
+        //     // what if there is no process? we go next 3adi
+        //     if(ready_queue.empty()){
+        //         // no process?
+        //         current_process_running = null_process;
+        //         cout << "NOTHING IN READY QUQUUE THO" << endl;
+        //         print_queue(ready_queue);
+        //         continue;
+        //     }
+        //     current_process_running = select_process(&ready_queue);
+
+        // }
+
+        //print_queue(ready_queue);
+    }
 
     // loop throught all_process, increment i when quantum reaached
     // at EACH quantum we have to check if curr process finished
@@ -95,10 +353,62 @@ vector<Process> run_rr(vector<string> string_processes,int num_processes,int las
     // process A
     // then loop through tracing list and if rn is A we show it is running,
     // if it isnt we show it is waitng given it arrived
+    return trace;
 }
 
+void printTrace(const std::vector<std::vector<char>>& trace, int num_processes, int last_instant) {
+    // Print the header (time instants)
+    std::cout << "Time Instants -> ";
+    for (int t = 0; t < last_instant; ++t) {
+        std::cout << "T" << t << " ";
+    }
+    std::cout << std::endl;
 
+    // Print the trace for each process (rows represent processes)
+    for (int i = 0; i < num_processes; ++i) {
+        std::cout << "P" << i << " -> ";  // Label for each process (P0, P1, P2, ...)
+        for (int j = 0; j < last_instant; ++j) {
+            std::cout << trace[i][j] << " ";  // Print each process's activity at each time instant
+        }
+        std::cout << std::endl;
+    }
+}
+string pad(string printme,int totalWidth){
+    // Calculate padding
+    int leftPadding = (totalWidth - printme.size()) / 2;
+    int rightPadding = totalWidth - printme.size() - leftPadding;
+    string padded;
+    // Print formatted output
+    padded = string(leftPadding, ' ') + printme + string(rightPadding, ' ');  // Add right padding
+    return padded;
+}
+void trace_ft(vector<vector<char>> &trace,vector<Process> processes ,int num_processes, int last_instant,int quantum){
+    string instants_string = pad("RR-"+to_string(quantum),6);
 
+    string dashes = "------"; // 6 till first instant
+    for(int i = 0;i<=last_instant;i++){
+        instants_string += to_string(i % 10) + " ";
+        dashes += "--";
+    }
+    cout << instants_string << endl;
+    cout << dashes << endl;
+
+    for(int i =0;i<num_processes;i++){
+        // for each process
+        string process_line = processes[i].process_name + "     "; // 5 spaces
+        
+        for(int j=0;j<=last_instant;j++){ // for each we add a | and smth
+            process_line += "|";
+            string character = string(1, trace[i][j]);
+
+            process_line += character;
+        }
+        cout << process_line << endl;
+    }
+    cout << dashes << endl;
+    cout << endl;
+    // do we need another endl?
+}
 
 // each policy needs:
 // command -string-
@@ -144,9 +454,16 @@ int main(int argc, char const *argv[]) {
          cout << process_string_vector[i] << endl;
     }
     
-    vector<Process> rr_processes = run_rr(process_string_vector,num_processes,last_instant); // we dont need last_instant?
+    vector<Process> all_processes = get_Processes_as_struct(process_string_vector,num_processes);
+    // Sort the processes based on arrival_time
+    sort(all_processes.begin(), all_processes.end(), [](const Process& a, const Process& b) {
+        return a.arrival_time < b.arrival_time;
+    });
 
+    vector<vector<char>> trace = run_rr(all_processes,num_processes,last_instant,quantum); // we dont need last_instant?
+    //printTrace(trace,num_processes,last_instant);
 
+    trace_ft(trace,all_processes,num_processes,last_instant,quantum);
     // cout << "Processes struct: " << endl;
     // for(int i = 0;i<num_processes;i++){
     //     cout << fcfs_processes[i].process_name << endl;
