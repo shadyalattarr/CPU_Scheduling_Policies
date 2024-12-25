@@ -44,7 +44,7 @@ hrrn: $(SRC_HRRN)
 	$(CXX) $(CXXFLAGS) -o hrrn $(SRC_HRRN)
 
 srt: $(SRC_SRT)
-	$(CXX) $(CXXFLAGS) -o srt $(SRC_FB_2I)
+	$(CXX) $(CXXFLAGS) -o srt $(SRC_SRT)
 
 # Clean rule to remove compiled files
 clean:

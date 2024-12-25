@@ -158,11 +158,11 @@ int main() {
         
         // cout << "process_string: " << process_string << endl;
         
-        // cout << "Running another program..." << endl; // policy vectotr is policy code
+        cout << "Running another program..." << endl; // policy vectotr is policy code
         string run = "./" + get_policy_name(policy_number) + " " + command + " " + policy_vector[i] + " " + to_string(last_instant) + " " + to_string(num_processes) + " " + process_string;
-        // cout << run << endl;
-        system(run.c_str()); // Run the other program
-        // cout << "The program exited with code: " << result << endl;
+        cout << run << endl;
+        int result = system(run.c_str()); // Run the other program
+        cout << "The program exited with code: " << result << endl;
 
 
     }
