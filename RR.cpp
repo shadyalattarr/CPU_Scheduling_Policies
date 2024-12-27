@@ -330,10 +330,10 @@ string getPaddedfloat(double value,int totalWidth, int precision) {
 }
 
 
-void stats_ft(int num_processes,vector<Process> processes){
+void stats_ft(int num_processes,vector<Process> processes,int quantum){
     double avg_taround = 0;
     double avg_normturn = 0;
-    cout << "RR-1" << endl;
+    cout << "RR-" << to_string(quantum) << endl;
     
     string process_line =    "Process    |";
     string arrival_line =    "Arrival    |";
@@ -436,7 +436,7 @@ int main(int argc, char const *argv[]) {
         trace_ft(trace,all_processes,num_processes,last_instant,quantum);
     }else if(command == "stats"){
         // cout << "gimme them stats" << endl;
-        stats_ft(num_processes,all_processes);
+        stats_ft(num_processes,all_processes,quantum);
     }
     
 

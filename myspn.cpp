@@ -15,12 +15,12 @@ struct Process{
     int start_time; // start time is not useful here?
     int service_time;
     int finish_time;
-    int remaining_time; // starts with 0 and when it reaches service time it is done
+    int remaining_time; // i think i will leave remaining time for the reusability of the code
 };
 
 struct CompareRemainingTime {
     bool operator()(const Process* a, const Process* b) const {
-        return a->remaining_time > b->remaining_time; // Min-heap based on remaining_time
+        return a->service_time > b->service_time; // Min-heap based on remaining_time
     }
 };
 vector<string> delimit(string to_delimit, char delimiter){
@@ -86,6 +86,8 @@ void serveProcess(Process* current_process_running, int time) {
     }
 }
 
+
+// i think we can remove has process?
 bool hasProcess(priority_queue<Process*, vector<Process*>, CompareRemainingTime>& pq, const Process& target) {
     // Temporary storage for elements
     std::vector<Process*> tempQueue;
@@ -147,7 +149,7 @@ void updateTrace(vector<vector<char>>& trace,
 }
 
 
-vector<vector<char>> run_srt(vector<Process>& all_processes,int num_processes,int last_instant){
+vector<vector<char>> run_spn(vector<Process>& all_processes,int num_processes,int last_instant){
     int next_process_to_be_ready = 0; // because we got the processes sorted with arrival time
     // Create a 2D vector
     vector<vector<char>> trace(num_processes, vector<char>(last_instant, ' '));
@@ -177,11 +179,9 @@ vector<vector<char>> run_srt(vector<Process>& all_processes,int num_processes,in
         }
         
         // at each time quantum, we get the srt
-        if((current_process_running->process_name != "null") && (current_process_running->remaining_time > 0)){
-            // there is currently running process and it is not done
-
-            pq.push(current_process_running); // to include the currently runnning process in the selection ig
-            current_process_running = select_process(&pq);
+        if(current_process_running->process_name != "null" && (current_process_running->remaining_time > 0)){
+            // there is currently running process
+            
             serveProcess(current_process_running,time);
         }
         else { // no currently running process
@@ -193,8 +193,7 @@ vector<vector<char>> run_srt(vector<Process>& all_processes,int num_processes,in
                 current_process_running = &null_process; // lazem 3ashan f update trace
             }
         }
-        
-        
+          
         updateTrace(trace,all_processes,*current_process_running,pq,time,num_processes);       
     }
 
@@ -212,7 +211,7 @@ string pad(string printme,int totalWidth){
 }
 
 void trace_ft(vector<vector<char>> &trace,vector<Process> processes ,int num_processes, int last_instant){
-    string instants_string ="SRT   ";
+    string instants_string ="SPN   ";
 
     string dashes = "------"; // 6 till first instant
     for(int i = 0;i<=last_instant;i++){
@@ -252,7 +251,7 @@ string getPaddedfloat(double value,int totalWidth, int precision) {
 void stats_ft(int num_processes,vector<Process> processes){
     double avg_taround = 0;
     double avg_normturn = 0;
-    cout << "SRT" << endl;
+    cout << "SPN" << endl;
     
     string process_line =    "Process    |";
     string arrival_line =    "Arrival    |";
@@ -289,11 +288,10 @@ void stats_ft(int num_processes,vector<Process> processes){
 }   
 
 
-
 int main(int argc, char const *argv[])
 {
     if(argc != 6){
-        cerr << "Usage: ./srt <command> <policy_code> <last_instant> <num_processes> <processes>\n";
+        cerr << "Usage: ./spn <command> <policy_code> <last_instant> <num_processes> <processes>\n";
         return 1;
     }
     
@@ -303,16 +301,6 @@ int main(int argc, char const *argv[])
     int last_instant = stoi(argv[3]);
     int num_processes = stoi(argv[4]);
     string process_string = argv[5];
-    
-    // cout << "command: "  << command << endl;
-
-    // cout << "policy code: " << policy_code << endl;
-
-    // cout << "last_instant: "  << last_instant << endl;
-
-    // cout << "num_processes: "  << num_processes << endl;
-        
-    // cout << "process_string: " << process_string << endl;
 
     vector<string> process_string_vector = delimit(process_string,'-');
     // for(int i =0;i<(int)process_string_vector.size();i++){
@@ -324,7 +312,7 @@ int main(int argc, char const *argv[])
     // Sort the processes based on arrival_time
     //idk if we sorting here or whatttt
 
-    vector<vector<char>> trace = run_srt(all_processes,num_processes,last_instant); // we dont need last_instant?
+    vector<vector<char>> trace = run_spn(all_processes,num_processes,last_instant); // we dont need last_instant?
     
     if(command == "trace"){
         // cout << "We tracing bois" << endl;

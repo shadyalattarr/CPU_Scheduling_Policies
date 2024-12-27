@@ -9,6 +9,8 @@
         "ostream": "cpp",
         "string_view": "cpp",
         "iomanip": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "queue": "cpp",
+        "algorithm": "cpp"
     }
 }
