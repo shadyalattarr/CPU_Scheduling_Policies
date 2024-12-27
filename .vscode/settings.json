@@ -11,6 +11,8 @@
         "iomanip": "cpp",
         "sstream": "cpp",
         "queue": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "tuple": "cpp",
+        "stdexcept": "cpp"
     }
 }

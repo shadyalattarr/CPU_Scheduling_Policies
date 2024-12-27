@@ -15,14 +15,17 @@ struct Process{
     int start_time; // start time is not useful here?
     int service_time;
     int finish_time;
-    int remaining_time; // i think i will leave remaining time for the reusability of the code
+    int remaining_time;
+    int wait_time;
+    double ratio;
 };
 
-struct CompareServiceTime {
+struct CompareRatio {
     bool operator()(const Process* a, const Process* b) const {
-        return a->service_time > b->service_time; // Min-heap based on remaining_time
+        return a->ratio < b->ratio; // max heap
     }
 };
+
 vector<string> delimit(string to_delimit, char delimiter){
     vector<string> result;
     stringstream ss(to_delimit);
@@ -48,6 +51,8 @@ vector<Process> get_Processes_as_struct(vector<string> processes,int num_process
         curr_process.arrival_time = stoi(curr_process_params[1]);
         curr_process.service_time = stoi(curr_process_params[2]);
         curr_process.remaining_time = curr_process.service_time;
+        curr_process.wait_time = 0;
+        curr_process.ratio = 1;
         // finish time is found out after running
         struct_Processes[i] = curr_process;
     }
@@ -55,7 +60,7 @@ vector<Process> get_Processes_as_struct(vector<string> processes,int num_process
     return struct_Processes;
 }
 
-Process* select_process(priority_queue<Process*, vector<Process*>, CompareServiceTime> * pq){
+Process* select_process(priority_queue<Process*, vector<Process*>, CompareRatio> * pq){
     if (pq->empty()) { // no process is ready
         // shouldnt stop execution tho
         // should not come here if ready queue is empty
@@ -88,9 +93,9 @@ void serveProcess(Process* current_process_running, int time) {
 
 
 // i think we can remove has process?
-bool hasProcess(priority_queue<Process*, vector<Process*>, CompareServiceTime>& pq, const Process& target) {
+bool hasProcess(priority_queue<Process*, vector<Process*>, CompareRatio>& pq, const Process& target) {
     // Temporary storage for elements
-    std::vector<Process*> tempQueue;
+    vector<Process*> tempQueue;
     bool found = false;
 
     // Extract elements from the priority queue
@@ -119,7 +124,7 @@ bool hasProcess(priority_queue<Process*, vector<Process*>, CompareServiceTime>& 
 void updateTrace(vector<vector<char>>& trace, 
                  const vector<Process>& all_processes, 
                  const Process& current_process_running, 
-                 priority_queue<Process*, vector<Process*>, CompareServiceTime> pq, 
+                 priority_queue<Process*, vector<Process*>, CompareRatio> pq, 
                  int time, 
                  int num_processes) {
     //cout << std::endl;
@@ -148,15 +153,44 @@ void updateTrace(vector<vector<char>>& trace,
     //cout << "-------------------------------------------" << endl << endl;
 }
 
+double calculate_ratio(Process p){
+    return (double)(p.service_time + p.wait_time) / (p.service_time);
+}
 
-vector<vector<char>> run_spn(vector<Process>& all_processes,int num_processes,int last_instant){
+void update_ratio(priority_queue<Process*, vector<Process*>, CompareRatio>& pq){ // i do not think we have to send the reference of the pq
+    // everything in priority queue is waiting
+    vector<Process*> tempQueue;
+
+    // Extract elements from the priority queue
+    while (!pq.empty()) {
+        Process* current = pq.top();
+        pq.pop();
+
+        current->wait_time++;
+        current->ratio = calculate_ratio(*current);
+
+        // Store the process in the temporary container
+        tempQueue.push_back(current);
+    }
+
+    // Reinsert elements back into the priority queue
+    for (Process* p : tempQueue) {
+        pq.push(p);
+    }
+
+    // if we send value of pq then np
+    // we can remove this loop above ^
+
+}
+
+vector<vector<char>> run_hrrn(vector<Process>& all_processes,int num_processes,int last_instant){
     int next_process_to_be_ready = 0; // because we got the processes sorted with arrival time
     // Create a 2D vector
     vector<vector<char>> trace(num_processes, vector<char>(last_instant, ' '));
 
     // Min-heap of Process, ordered by remaining_time
     // we use the pq to get the srt if ready processes
-    priority_queue<Process*, vector<Process*>, CompareServiceTime> pq; 
+    priority_queue<Process*, vector<Process*>, CompareRatio> pq; 
 
     Process null_process;
     null_process.process_name = "null";
@@ -178,7 +212,7 @@ vector<vector<char>> run_spn(vector<Process>& all_processes,int num_processes,in
             next_process_to_be_ready++;
         }
         
-        // at each time quantum, we get the srt
+        // at each time quantum, we get the one with highest ratio
         if(current_process_running->process_name != "null" && (current_process_running->remaining_time > 0)){
             // there is currently running process
             
@@ -193,7 +227,9 @@ vector<vector<char>> run_spn(vector<Process>& all_processes,int num_processes,in
                 current_process_running = &null_process; // lazem 3ashan f update trace
             }
         }
-          
+        
+
+        update_ratio(pq);
         updateTrace(trace,all_processes,*current_process_running,pq,time,num_processes);       
     }
 
@@ -211,7 +247,7 @@ string pad(string printme,int totalWidth){
 }
 
 void trace_ft(vector<vector<char>> &trace,vector<Process> processes ,int num_processes, int last_instant){
-    string instants_string ="SPN   ";
+    string instants_string ="HRRN  ";
 
     string dashes = "------"; // 6 till first instant
     for(int i = 0;i<=last_instant;i++){
@@ -251,7 +287,7 @@ string getPaddedfloat(double value,int totalWidth, int precision) {
 void stats_ft(int num_processes,vector<Process> processes){
     double avg_taround = 0;
     double avg_normturn = 0;
-    cout << "SPN" << endl;
+    cout << "HRRN" << endl;
     
     string process_line =    "Process    |";
     string arrival_line =    "Arrival    |";
@@ -312,7 +348,7 @@ int main(int argc, char const *argv[])
     // Sort the processes based on arrival_time
     //idk if we sorting here or whatttt
 
-    vector<vector<char>> trace = run_spn(all_processes,num_processes,last_instant); // we dont need last_instant?
+    vector<vector<char>> trace = run_hrrn(all_processes,num_processes,last_instant); // we dont need last_instant?
     
     if(command == "trace"){
         // cout << "We tracing bois" << endl;
