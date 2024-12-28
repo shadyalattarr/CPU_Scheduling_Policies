@@ -17,7 +17,7 @@ struct Process{
     int curr_priority;
     int remaining_time;
     int time_served_so_far;
-    //int wait_time; // i dont think that's needed?
+    int wait_time; // i dont think that's needed?
 };
 
 // struct ComparePriority {
@@ -29,7 +29,7 @@ struct Process{
 struct ComparePriority {
     bool operator()(const Process* a, const Process* b) const {
         if (a->curr_priority == b->curr_priority) {
-            return a->initial_priority > b->initial_priority; // Prefer smaller start_time
+            return a->wait_time < b->wait_time; // Prefer larger start_time
         }
         return a->curr_priority < b->curr_priority; // Max heap based on curr_priority
     }
@@ -74,6 +74,7 @@ vector<Process> get_Processes_as_struct(vector<string> processes,int num_process
         curr_process.initial_priority = stoi(curr_process_params[2]);
         curr_process.curr_priority = curr_process.initial_priority;
         curr_process.time_served_so_far = 0;
+        curr_process.wait_time = 0;
         // no remaining time cuz no service time
         // finish time is found out after running
         struct_Processes[i] = curr_process;
@@ -108,6 +109,7 @@ void update_priority(priority_queue<Process*, vector<Process*>, ComparePriority>
         pq.pop();
 
         current->curr_priority++; 
+        current->wait_time++;
         //cout << "PRIORITY OF " << current->process_name << " in ready is " << current->curr_priority << endl;
         // Store the process in the temporary container
         tempQueue.push_back(current);
@@ -154,6 +156,7 @@ bool hasProcess(priority_queue<Process*, vector<Process*>, ComparePriority>& pq,
 void serveProcess(Process* current_process_running) {
     // Increment time served so far
     current_process_running->time_served_so_far++;
+    current_process_running->wait_time = 0;
 }
 
 
