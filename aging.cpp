@@ -13,16 +13,25 @@ struct Process{
     string process_name;
     int arrival_time;
     int start_time; // start time is not useful here?
-    int service_time;
-    int finish_time;
+    int initial_priority;
+    int curr_priority;
     int remaining_time;
-    int wait_time;
-    double ratio;
+    int time_served_so_far;
+    //int wait_time; // i dont think that's needed?
 };
 
-struct CompareRatio {
+// struct ComparePriority {
+//     bool operator()(const Process* a, const Process* b) const {
+//         return a->curr_priority < b->curr_priority; // max heap
+//     }
+// };
+
+struct ComparePriority {
     bool operator()(const Process* a, const Process* b) const {
-        return a->ratio < b->ratio; // max heap
+        if (a->curr_priority == b->curr_priority) {
+            return a->initial_priority > b->initial_priority; // Prefer smaller start_time
+        }
+        return a->curr_priority < b->curr_priority; // Max heap based on curr_priority
     }
 };
 
@@ -40,6 +49,19 @@ vector<string> delimit(string to_delimit, char delimiter){
     return result;
 }
 
+void get_policy_number(string policy_code,int *policy_number,int* q){
+    if(policy_code.length() > 1){
+        vector<string> components = delimit(policy_code,'-');
+        *policy_number = stoi(components[0]);
+        *q = stoi(components[1]);
+    }
+    else{
+        *policy_number = stoi(policy_code);
+        *q = 0; // to know it isnt usable
+    }
+}
+
+
 vector<Process> get_Processes_as_struct(vector<string> processes,int num_processes){
     vector<Process> struct_Processes(num_processes);
     
@@ -49,10 +71,10 @@ vector<Process> get_Processes_as_struct(vector<string> processes,int num_process
         Process curr_process;
         curr_process.process_name = curr_process_params[0];
         curr_process.arrival_time = stoi(curr_process_params[1]);
-        curr_process.service_time = stoi(curr_process_params[2]);
-        curr_process.remaining_time = curr_process.service_time;
-        curr_process.wait_time = 0;
-        curr_process.ratio = 1;
+        curr_process.initial_priority = stoi(curr_process_params[2]);
+        curr_process.curr_priority = curr_process.initial_priority;
+        curr_process.time_served_so_far = 0;
+        // no remaining time cuz no service time
         // finish time is found out after running
         struct_Processes[i] = curr_process;
     }
@@ -60,11 +82,11 @@ vector<Process> get_Processes_as_struct(vector<string> processes,int num_process
     return struct_Processes;
 }
 
-Process* select_process(priority_queue<Process*, vector<Process*>, CompareRatio> * pq){
+Process* select_process(priority_queue<Process*, vector<Process*>, ComparePriority> * pq){
     if (pq->empty()) { // no process is ready
         // shouldnt stop execution tho
         // should not come here if ready queue is empty
-        throw std::runtime_error("Error: Priority Queue is empty, no process to select.");
+        throw runtime_error("Error: Priority Queue is empty, no process to select.");
     }
 
     // Get the process at the front of the queue
@@ -76,24 +98,33 @@ Process* select_process(priority_queue<Process*, vector<Process*>, CompareRatio>
     return selected_process;
 }
 
-void serveProcess(Process* current_process_running, int time) {
-    // Increment time served so far
-    current_process_running->remaining_time--;
+void update_priority(priority_queue<Process*, vector<Process*>, ComparePriority>& pq){ // i do not think we have to send the reference of the pq
+    // everything in priority queue is waiting
+    vector<Process*> tempQueue;
 
-    // Print serving message
-    //cout << "SERVING : " << current_process_running.process_name << endl;
+    // Extract elements from the priority queue
+    while (!pq.empty()) {
+        Process* current = pq.top();
+        pq.pop();
 
-    // Check if the process has finished
-    if (current_process_running->remaining_time == 0) {
-        // Process is done
-        current_process_running->finish_time = time + 1;
-        //cout << "Process " << current_process_running->process_name << " just finished at time " << current_process_running->finish_time << std::endl;
+        current->curr_priority++; 
+        //cout << "PRIORITY OF " << current->process_name << " in ready is " << current->curr_priority << endl;
+        // Store the process in the temporary container
+        tempQueue.push_back(current);
     }
+
+    // Reinsert elements back into the priority queue
+    for (Process* p : tempQueue) {
+        pq.push(p);
+    }
+
+    // if we send value of pq then np
+    // we can remove this loop above ^
+
 }
 
-
 // i think we can remove has process?
-bool hasProcess(priority_queue<Process*, vector<Process*>, CompareRatio>& pq, const Process& target) {
+bool hasProcess(priority_queue<Process*, vector<Process*>, ComparePriority>& pq, const Process& target) {
     // Temporary storage for elements
     vector<Process*> tempQueue;
     bool found = false;
@@ -120,11 +151,17 @@ bool hasProcess(priority_queue<Process*, vector<Process*>, CompareRatio>& pq, co
     return found;
 }
 
+void serveProcess(Process* current_process_running) {
+    // Increment time served so far
+    current_process_running->time_served_so_far++;
+}
+
+
 
 void updateTrace(vector<vector<char>>& trace, 
                  const vector<Process>& all_processes, 
                  const Process& current_process_running, 
-                 priority_queue<Process*, vector<Process*>, CompareRatio> pq, 
+                 priority_queue<Process*, vector<Process*>, ComparePriority> pq, 
                  int time, 
                  int num_processes) {
     //cout << std::endl;
@@ -153,44 +190,15 @@ void updateTrace(vector<vector<char>>& trace,
     //cout << "-------------------------------------------" << endl << endl;
 }
 
-double calculate_ratio(Process p){
-    return (double)(p.service_time + p.wait_time) / (p.service_time);
-}
 
-void update_ratio(priority_queue<Process*, vector<Process*>, CompareRatio>& pq){ // i do not think we have to send the reference of the pq
-    // everything in priority queue is waiting
-    vector<Process*> tempQueue;
-
-    // Extract elements from the priority queue
-    while (!pq.empty()) {
-        Process* current = pq.top();
-        pq.pop();
-
-        current->wait_time++;
-        current->ratio = calculate_ratio(*current);
-
-        // Store the process in the temporary container
-        tempQueue.push_back(current);
-    }
-
-    // Reinsert elements back into the priority queue
-    for (Process* p : tempQueue) {
-        pq.push(p);
-    }
-
-    // if we send value of pq then np
-    // we can remove this loop above ^
-
-}
-
-vector<vector<char>> run_hrrn(vector<Process>& all_processes,int num_processes,int last_instant){
+vector<vector<char>> run_aging(vector<Process>& all_processes,int num_processes,int last_instant, int quantum){
     int next_process_to_be_ready = 0; // because we got the processes sorted with arrival time
     // Create a 2D vector
     vector<vector<char>> trace(num_processes, vector<char>(last_instant, ' '));
 
     // Min-heap of Process, ordered by remaining_time
     // we use the pq to get the srt if ready processes
-    priority_queue<Process*, vector<Process*>, CompareRatio> pq; 
+    priority_queue<Process*, vector<Process*>, ComparePriority> pq; 
 
     Process null_process;
     null_process.process_name = "null";
@@ -212,29 +220,62 @@ vector<vector<char>> run_hrrn(vector<Process>& all_processes,int num_processes,i
             next_process_to_be_ready++;
         }
         
+        
         // at each time quantum, we get the one with highest ratio
-        if(current_process_running->process_name != "null" && (current_process_running->remaining_time > 0)){
+        if(current_process_running->process_name != "null"){
             // there is currently running process
+            // process doesnt end so nn to check if it is done or not
+            serveProcess(current_process_running);
+            if(time%quantum == 0){ // can start at awkward time so better use timeservedsofar
+                // it's time is done
+                // quantum finished
+                // scheduler called
+
+
+
+
+
+
+                //set priority of currently to old
+                current_process_running->curr_priority = current_process_running->initial_priority;
+                // increment ready
+                //cout << "Time: " << time << endl;
+                //cout << "current process: " << current_process_running->process_name << " is " << current_process_running->curr_priority << endl;
+                
+                update_priority(pq);
+                //cout << endl;
+                // choose from eligibles
+                pq.push(current_process_running); // preempt process
+                current_process_running = select_process(&pq); // if it is the only one then np
+                //cout << "AND TOOK " << current_process_running.process_name << endl;
+            }
+            // serve in both cases, differs on who served only
             
-            serveProcess(current_process_running,time);
         }
         else { // no currently running process
             if(!pq.empty()){
                 // smth ready
+                //set old
+                //mfeesh
+                //update all ready
+                // cout << "Time: " << time << endl;
+                // update_priority(pq);
+                // cout << endl;
+                //choose from eligibles
                 current_process_running = select_process(&pq);
-                serveProcess(current_process_running,time);
+                serveProcess(current_process_running);
             }else{
                 current_process_running = &null_process; // lazem 3ashan f update trace
             }
         }
         
-
-        update_ratio(pq);
         updateTrace(trace,all_processes,*current_process_running,pq,time,num_processes);       
+        
     }
 
     return trace;
 }
+
 
 string pad(string printme,int totalWidth){
     // Calculate padding
@@ -246,8 +287,8 @@ string pad(string printme,int totalWidth){
     return padded;
 }
 
-void trace_ft(vector<vector<char>> &trace,vector<Process> processes ,int num_processes, int last_instant){
-    string instants_string ="HRRN  ";
+void trace_ft(vector<vector<char>> &trace,vector<Process> processes ,int num_processes, int last_instant){ // nn quantum here
+    string instants_string ="Aging ";
 
     string dashes = "------"; // 6 till first instant
     for(int i = 0;i<=last_instant;i++){
@@ -257,10 +298,13 @@ void trace_ft(vector<vector<char>> &trace,vector<Process> processes ,int num_pro
     cout << instants_string << endl;
     cout << dashes << endl;
 
+
     for(int i =0;i<num_processes;i++){
         // for each process
         string process_line = processes[i].process_name + "     "; // 5 spaces
+        
         trace[i][last_instant] = ' '; // end is space
+        
         for(int j=0;j<=last_instant;j++){ // for each we add a | and smth
             process_line += "|";
             string character = string(1, trace[i][j]);
@@ -274,90 +318,52 @@ void trace_ft(vector<vector<char>> &trace,vector<Process> processes ,int num_pro
     // do we need another endl?
 }
 
-
-string getPaddedfloat(double value,int totalWidth, int precision) {
-    ostringstream oss;
-    oss << setw(totalWidth) // Total width for the number (including decimal places)
-        << fixed << setprecision(precision) // Fixed-point notation with 2 decimal places
-        << value;
-    return oss.str();
-}
-
-
-void stats_ft(int num_processes,vector<Process> processes){
-    double avg_taround = 0;
-    double avg_normturn = 0;
-    cout << "HRRN" << endl;
-    
-    string process_line =    "Process    |";
-    string arrival_line =    "Arrival    |";
-    string service_line =    "Service    |";
-    string finish_line =     "Finish     |";
-    string turnaround_line = "Turnaround |"; 
-    string normturn_line  =  "NormTurn   |";
-    
-    for(int i=0;i<num_processes;i++){
-        int arrival = processes[i].arrival_time;
-        int service = processes[i].service_time;
-        //int start = processes[i].start_time;
-        int finish = processes[i].finish_time;
-        process_line += pad(processes[i].process_name,5) + "|";
-        arrival_line += pad(to_string(arrival),5) + "|";
-        service_line += pad(to_string(service),5) + "|";
-        finish_line += pad(to_string(finish),5) + "|";
-        int turnaround = finish-arrival;
-        avg_taround += turnaround;
-        turnaround_line += pad(to_string(turnaround),5) + "|";
-        double normturn = (double)turnaround/service;
-        avg_normturn += normturn;
-        normturn_line += getPaddedfloat(normturn,5,2) + "|";
-    }
-    cout << process_line << endl;
-    cout << arrival_line << endl;
-    cout << service_line    << " Mean|" << endl;
-    cout << finish_line     << "-----|" << endl;
-    avg_taround /= num_processes;
-    cout << turnaround_line << getPaddedfloat(avg_taround,5,2) << "|" << endl;
-    avg_normturn /= num_processes;
-    cout << normturn_line << getPaddedfloat(avg_normturn,5,2) << "|" << endl;
-    cout << endl;
-}   
-
-
 int main(int argc, char const *argv[])
 {
-    if(argc != 6){
-        cerr << "Usage: ./hrrn <command> <policy_code> <last_instant> <num_processes> <processes>\n";
+if(argc != 6){
+        cerr << "Usage: ./aging <command> <policy_code> <last_instant> <num_processes> <processes>\n";
         return 1;
     }
     
     // Convert arguments to std::string
     string command = argv[1];
-    string policy_code = argv[2]; // wont make use of this here
+    string policy_code = argv[2];
     int last_instant = stoi(argv[3]);
     int num_processes = stoi(argv[4]);
     string process_string = argv[5];
+    
+    // cout << "command: "  << command << endl;
+
+    // cout << "policy code: " << policy_code << endl;
+    
+    int polciy_number;
+    int quantum;
+    get_policy_number(policy_code,&polciy_number,&quantum);
+
+    // cout << "policy Number: " << polciy_number << endl;
+
+    // cout << "quantum: " << quantum << endl;
+
+    // cout << "last_instant: "  << last_instant << endl;
+
+    // cout << "num_processes: "  << num_processes << endl;
+        
+    // cout << "process_string: " << process_string << endl;
 
     vector<string> process_string_vector = delimit(process_string,'-');
     // for(int i =0;i<(int)process_string_vector.size();i++){
-    //     cout << process_string_vector[i] << endl;
+    //      cout << process_string_vector[i] << endl;
     // }
-
+    
     vector<Process> all_processes = get_Processes_as_struct(process_string_vector,num_processes);
     
-    // Sort the processes based on arrival_time
-    //idk if we sorting here or whatttt
 
-    vector<vector<char>> trace = run_hrrn(all_processes,num_processes,last_instant); // we dont need last_instant?
+    vector<vector<char>> trace = run_aging(all_processes,num_processes,last_instant,quantum); // we dont need last_instant?
     
     if(command == "trace"){
         // cout << "We tracing bois" << endl;
         trace_ft(trace,all_processes,num_processes,last_instant);
-    }else if(command == "stats"){
-        // cout << "gimme them stats" << endl;
-        stats_ft(num_processes,all_processes);
     }
-    
-    
+
     return 0;
 }

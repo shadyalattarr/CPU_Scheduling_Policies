@@ -5,7 +5,7 @@ CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17
 
 # Target executables
-TARGETS = lab6 fcfs rr spn hrrn fb_2i fb_1 srt
+TARGETS = lab6 fcfs rr spn hrrn fb_2i fb_1 srt aging
 
 # Source files
 SRC_LAB6 = lab6.cpp
@@ -16,6 +16,7 @@ SRC_HRRN = myhrrn.cpp
 SRC_FB_1 = fb_1.cpp
 SRC_FB_2I = fb_2i.cpp
 SRC_SRT = SRT.cpp
+SRC_AGING = aging.cpp
 
 # Default rule to build all executables
 all: $(TARGETS)
@@ -45,6 +46,9 @@ hrrn: $(SRC_HRRN)
 
 srt: $(SRC_SRT)
 	$(CXX) $(CXXFLAGS) -o srt $(SRC_SRT)
+
+aging: $(SRC_AGING)
+	$(CXX) $(CXXFLAGS) -o aging $(SRC_AGING)
 
 # Clean rule to remove compiled files
 clean:

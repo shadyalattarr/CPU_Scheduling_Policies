@@ -224,7 +224,7 @@ void trace_ft(vector<vector<char>> &trace,vector<Process> processes ,int num_pro
     for(int i =0;i<num_processes;i++){
         // for each process
         string process_line = processes[i].process_name + "     "; // 5 spaces
-        
+        trace[i][last_instant] = ' '; // end is space
         for(int j=0;j<=last_instant;j++){ // for each we add a | and smth
             process_line += "|";
             string character = string(1, trace[i][j]);
