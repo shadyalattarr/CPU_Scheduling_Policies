@@ -228,8 +228,8 @@ vector<vector<char>> run_aging(vector<Process>& all_processes,int num_processes,
         if(current_process_running->process_name != "null"){
             // there is currently running process
             // process doesnt end so nn to check if it is done or not
-            serveProcess(current_process_running);
-            if(time%quantum == 0){ // can start at awkward time so better use timeservedsofar
+            
+            if(current_process_running->time_served_so_far%quantum == 0){ // can start at awkward time so better use timeservedsofar
                 // it's time is done
                 // quantum finished
                 // scheduler called
@@ -253,7 +253,7 @@ vector<vector<char>> run_aging(vector<Process>& all_processes,int num_processes,
                 //cout << "AND TOOK " << current_process_running.process_name << endl;
             }
             // serve in both cases, differs on who served only
-            
+            serveProcess(current_process_running);
         }
         else { // no currently running process
             if(!pq.empty()){
