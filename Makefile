@@ -13,8 +13,8 @@ SRC_FCFS = FCFS.cpp
 SRC_RR = RR.cpp
 SRC_SPN = myspn.cpp
 SRC_HRRN = myhrrn.cpp
-SRC_FB_1 = fb_1.cpp
-SRC_FB_2I = fb_2i.cpp
+SRC_FB_1 = myfb_1.cpp
+SRC_FB_2I = myfb_2i.cpp
 SRC_SRT = SRT.cpp
 SRC_AGING = aging.cpp
 
